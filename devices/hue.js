@@ -4,7 +4,7 @@
 "use strict";
 const huejay = require('huejay');
 
-class HueDevice {
+class HueBridge {
     constructor() {
         this.ip = null;
         this.username = null;
@@ -25,7 +25,7 @@ class HueDevice {
             })
     }
 
-    getChildDevices(){
+    getDevices(){
         return this.client.lights.getAll()
             .then(lights => {
                 console.log('Got lights');
@@ -43,15 +43,26 @@ function createUser(bridge) {
     const client = new huejay.Client({
         host: bridge.ip
     });
-    const user = new client.users.User;
+    const user = new client.users.User({});
     user.deviceType = 'mote';
 
-
     const timeout = new Promise((resolve, reject) => {
-        setTimeout(reject, 30000);
+        setTimeout(reject.bind(null, 'Link button not pressed!'), 30000);
     });
-    // FIXME: Need to check bridge.linkButtonEnabled on before calling this.
-    const createUser = client.users.create(user);
+    const createUser = new Promise((resolve) => {
+        tryCreateUser();
+        function tryCreateUser(){
+            console.log('Checking if we can create a user...');
+            if(bridge.linkButtonEnabled){ // FIXME: We never seem to get in here :-/
+                console.log('Yep! Link button was pressed');
+                client.users.create(user).then(resolve);
+            }
+            else{
+                console.log('Nope. Trying again in 2s');
+                setTimeout(tryCreateUser, 2000);
+            }
+        }
+    });
     return Promise.race([timeout, createUser]);
 
 }
@@ -62,4 +73,4 @@ function getClient(bridge, user) {
     })
 }
 
-module.exports = HueDevice;
+module.exports = HueBridge;
