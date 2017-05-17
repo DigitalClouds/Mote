@@ -25,7 +25,7 @@ class HueBridge {
             })
     }
 
-    getDevices(){
+    getDevices() {
         return this.client.lights.getAll()
             .then(lights => {
                 console.log('Got lights');
@@ -45,29 +45,38 @@ function createUser(bridge) {
     });
     const user = new client.users.User({});
     user.deviceType = 'mote';
-
+    let cancel = false;
     const timeout = new Promise((resolve, reject) => {
-        setTimeout(reject.bind(null, 'Link button not pressed!'), 30000);
+        setTimeout(()=>{
+            cancel = true;
+            reject('Timed out: Link button not pressed!');
+        }, 30000);
     });
     const createUser = new Promise((resolve) => {
         tryCreateUser();
-        function tryCreateUser(){
+
+        function tryCreateUser() {
             console.log('Checking if we can create a user...');
-            if(bridge.linkButtonEnabled){ // FIXME: We never seem to get in here :-/
-                console.log('Yep! Link button was pressed');
-                client.users.create(user).then(resolve);
-            }
-            else{
-                console.log('Nope. Trying again in 2s');
-                setTimeout(tryCreateUser, 2000);
-            }
+
+            client.users.create(user)
+                .then(() => {
+                    console.log('Yep! Link button was pressed');
+                    resolve();
+                }).catch(() => {
+                    if(!cancel) {
+                        console.log('Nope! Trying again in a second...');
+                        setTimeout(tryCreateUser, 1000);
+                    }
+                })
         }
     });
     return Promise.race([timeout, createUser]);
 
 }
 function getClient(bridge, user) {
+    console.log('Getting client...');
     return new huejay.Client({
+
         host: bridge.ip,
         username: user.username
     })
